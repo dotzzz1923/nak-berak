@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131d">
+  <title>Nak Berak — Chat Organisasi</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0e14;--panel:#141a25;--panel2:#1b2432;--line:#293447;--text:#f3f5fa;--muted:#9ba8ba;--accent:#7c6cff;--accent2:#5c4de0;--danger:#ff7272}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1b2140 0,#0b0e14 48%);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+    button,input{font:inherit}button{cursor:pointer;border:0;border-radius:12px;padding:12px 16px;background:var(--accent);color:white;font-weight:700}button:disabled{opacity:.55;cursor:not-allowed}
+    .wrap{max-width:900px;margin:auto;padding:22px 16px;min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .card{width:100%;max-width:440px;background:rgba(20,26,37,.96);border:1px solid var(--line);border-radius:22px;padding:25px;box-shadow:0 20px 70px #0008}
+    .brand{display:flex;align-items:center;gap:13px;margin-bottom:22px}.logo{width:48px;height:48px;border-radius:16px;background:linear-gradient(135deg,#897cff,#5142c9);display:grid;place-items:center;font-size:23px;font-weight:900}.brand h1{font-size:22px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}
+    h2{font-size:20px;margin:0 0 7px}.sub{color:var(--muted);margin:0 0 20px;font-size:14px}.field{margin:13px 0}.field label{display:block;color:#c5cede;font-size:13px;margin-bottom:7px}.field input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#0e1420;color:var(--text);outline:none}.field input:focus{border-color:var(--accent)}
+    .wide{width:100%;margin-top:8px}.switch{background:transparent;color:#bdb5ff;padding:10px 4px;width:100%;font-weight:600}.notice{font-size:13px;color:var(--muted);line-height:1.5;margin-top:15px}.status{font-size:13px;margin:12px 0;color:#b9c4d4;min-height:20px}.status.error{color:var(--danger)}.hidden{display:none!important}
+    #chat{width:100%;max-width:900px;height:min(850px,calc(100vh - 32px));background:var(--panel);border:1px solid var(--line);border-radius:22px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 70px #0008}
+    .top{padding:15px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#171e2b}.top strong{font-size:17px}.top small{display:block;color:var(--muted);margin-top:2px}.top button{padding:9px 12px;background:#293447;font-size:13px}
+    .roombar{padding:12px 18px;border-bottom:1px solid var(--line);color:#c7c1ff;font-weight:700;font-size:14px}
+    #messages{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:11px}
+    .msg{max-width:82%;align-self:flex-start;background:var(--panel2);border:1px solid #2b374b;border-radius:15px 15px 15px 4px;padding:10px 12px;overflow-wrap:anywhere}.msg.mine{align-self:flex-end;background:#39326e;border-color:#5146a0;border-radius:15px 15px 4px 15px}.sender{font-size:11px;color:#c0b6ff;font-weight:800;margin-bottom:4px}.body{white-space:pre-wrap;line-height:1.4}.time{font-size:10px;color:#a8b2c2;text-align:right;margin-top:5px}
+    .empty{color:var(--muted);text-align:center;margin:auto;font-size:14px}.composer{display:flex;gap:9px;padding:13px;border-top:1px solid var(--line);background:#171e2b}.composer input{flex:1;min-width:0;border:1px solid var(--line);border-radius:13px;padding:12px;background:#0e1420;color:white;outline:none}.composer button{padding:0 18px}
+    @media(max-width:600px){.wrap{padding:0}#chat{height:100dvh;border-radius:0;border:0}.card{border-radius:0;min-height:100vh;display:flex;flex-direction:column;justify-content:center}.msg{max-width:90%}.top{padding-top:18px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section id="auth" class="card">
+    <div class="brand"><div class="logo">NB</div><div><h1>Nak Berak</h1><p>Ruang komunikasi organisasi</p></div></div>
+    <h2 id="formTitle">Masuk ke akun</h2>
+    <p class="sub" id="formSub">Gunakan email dan password untuk melanjutkan.</p>
+    <form id="authForm">
+      <div class="field hidden" id="nameField"><label for="fullName">Nama lengkap</label><input id="fullName" autocomplete="name" placeholder="Nama kamu"></div>
+      <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" required placeholder="nama@email.com"></div>
+      <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Minimal 6 karakter"></div>
+      <button class="wide" id="submitAuth" type="submit">Masuk</button>
+    </form>
+    <button class="switch" id="toggleMode" type="button">Belum punya akun? Daftar</button>
+    <div class="status" id="authStatus" role="status"></div>
+    <p class="notice">Pendaftaran terbuka. Setelah akun berhasil dibuat dan diverifikasi bila diminta, kamu akan bergabung ke Grup Utama Nak Berak.</p>
+  </section>
+
+  <section id="chat" class="hidden">
+    <header class="top"><div><strong>Nak Berak</strong><small id="userLabel">Terhubung</small></div><button id="logout" type="button">Keluar</button></header>
+    <div class="roombar" id="roomTitle">Grup Utama</div>
+    <main id="messages"><div class="empty">Memuat percakapan…</div></main>
+    <form class="composer" id="messageForm"><input id="messageInput" maxlength="4000" autocomplete="off" placeholder="Tulis pesan…" required><button type="submit">Kirim</button></form>
+  </section>
+</div>
+
+<script>
+(() => {
+  // GANTI DUA NILAI DI BAWAH INI DENGAN DATA PROYEK SUPABASE MILIKMU.
+  const SUPABASE_URL = "https://hncgwjrhdhyrfnmolouq.supabase.co/rest/v1/";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ZsZaK6ruw39GSgwVVrAg5g_ClJtFTiK";
+
+  const $ = (id) => document.getElementById(id);
+  const authPanel = $("auth"), chatPanel = $("chat");
+  let supabase, isRegister = false, currentUser = null, currentRoom = null, channel = null;
+
+  function status(message, error=false) {
+    $("authStatus").textContent = message;
+    $("authStatus").className = "status" + (error ? " error" : "");
+  }
+  function configReady() {
+    return SUPABASE_URL.startsWith("https://") &&
+      SUPABASE_PUBLISHABLE_KEY.length > 20 &&
+      !SUPABASE_URL.includes("TEMPEL_") &&
+      !SUPABASE_PUBLISHABLE_KEY.includes("TEMPEL_");
+  }
+  function setMode(register) {
+    isRegister = register;
+    $("formTitle").textContent = register ? "Buat akun baru" : "Masuk ke akun";
+    $("formSub").textContent = register ? "Daftar untuk bergabung dengan organisasi." : "Gunakan email dan password untuk melanjutkan.";
+    $("nameField").classList.toggle("hidden", !register);
+    $("fullName").required = register;
+    $("submitAuth").textContent = register ? "Daftar" : "Masuk";
+    $("toggleMode").textContent = register ? "Sudah punya akun? Masuk" : "Belum punya akun? Daftar";
+    $("password").autocomplete = register ? "new-password" : "current-password";
+    status("");
+  }
+  $("toggleMode").addEventListener("click", () => setMode(!isRegister));
+
+  function addMessage(message) {
+    const empty = $("messages").querySelector(".empty");
+    if (empty) empty.remove();
+    const node = document.createElement("article");
+    node.className = "msg" + (message.sender_id === currentUser.id ? " mine" : "");
+    const sender = document.createElement("div");
+    sender.className = "sender";
+    sender.textContent = message.sender_id === currentUser.id ? "Kamu" : (message.sender_name || "Anggota");
+    const body = document.createElement("div");
+    body.className = "body";
+    body.textContent = message.content || (message.image_path ? "📷 Foto terlampir" : message.audio_path ? "🎤 Pesan suara" : "");
+    const time = document.createElement("div");
+    time.className = "time";
+    time.textContent = new Date(message.created_at).toLocaleTimeString("id-ID", {hour:"2-digit",minute:"2-digit"});
+    node.append(sender, body, time);
+    $("messages").append(node);
+    $("messages").scrollTop = $("messages").scrollHeight;
+  }
+
+  async function loadChat() {
+    const { data: rooms, error: roomError } = await supabase.from("rooms").select("id,name").order("created_at");
+    if (roomError) throw roomError;
+    currentRoom = rooms && rooms[0];
+    if (!currentRoom) throw new Error("Grup belum tersedia. Periksa apakah SQL database sudah dijalankan.");
+    $("roomTitle").textContent = currentRoom.name;
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", currentUser.id).maybeSingle();
+    $("userLabel").textContent = (profile?.full_name || currentUser.email) + " • online";
+    const { data: rows, error } = await supabase.from("messages").select("id,room_id,sender_id,content,image_path,audio_path,created_at").eq("room_id", currentRoom.id).order("created_at", {ascending:true}).limit(100);
+    if (error) throw error;
+    $("messages").innerHTML = "";
+    if (!rows?.length) $("messages").innerHTML = '<div class="empty">Belum ada pesan. Mulai percakapan pertama!</div>';
+    else rows.forEach(addMessage);
+    if (channel) await supabase.removeChannel(channel);
+    channel = supabase.channel("room-" + currentRoom.id)
+      .on("postgres_changes", {event:"INSERT",schema:"public",table:"messages",filter:"room_id=eq."+currentRoom.id}, payload => {
+        if (payload.new.sender_id !== currentUser.id) addMessage(payload.new);
+      }).subscribe();
+  }
+
+  async function showSession(session) {
+    currentUser = session.user;
+    authPanel.classList.add("hidden");
+    chatPanel.classList.remove("hidden");
+    $("messages").innerHTML = '<div class="empty">Memuat percakapan…</div>';
+    try { await loadChat(); }
+    catch (e) { $("messages").innerHTML = ""; const n=document.createElement("div"); n.className="empty"; n.textContent="Gagal memuat: "+e.message; $("messages").append(n); }
+  }
+
+  $("authForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!configReady()) { status("URL dan Publishable Key Supabase belum diisi di dalam file index.html.", true); return; }
+    const button = $("submitAuth"); button.disabled = true; status("Memproses…");
+    const email = $("email").value.trim(), password = $("password").value;
+    try {
+      if (isRegister) {
+        const full_name = $("fullName").value.trim();
+        const { data, error } = await supabase.auth.signUp({email,password,options:{data:{full_name}}});
+        if (error) throw error;
+        if (data.session) await showSession(data.session);
+        else status("Pendaftaran berhasil. Periksa email untuk konfirmasi, lalu masuk kembali.");
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({email,password});
+        if (error) throw error;
+        await showSession(data.session);
+      }
+    } catch (e) { status(e.message, true); }
+    finally { button.disabled = false; }
+  });
+
+  $("messageForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = $("messageInput"), content = input.value.trim();
+    if (!content || !currentRoom || !currentUser) return;
+    const button = $("messageForm").querySelector("button"); button.disabled = true;
+    const { data, error } = await supabase.from("messages").insert({room_id:currentRoom.id,sender_id:currentUser.id,content}).select().single();
+    button.disabled = false;
+    if (error) { alert("Pesan gagal dikirim: " + error.message); return; }
+    input.value = ""; addMessage(data);
+  });
+
+  $("logout").addEventListener("click", async () => {
+    if (channel) await supabase.removeChannel(channel);
+    await supabase.auth.signOut();
+    currentUser = null; currentRoom = null;
+    chatPanel.classList.add("hidden"); authPanel.classList.remove("hidden"); setMode(false);
+  });
+
+  if (!configReady()) status("File sudah siap. Isi URL dan Publishable Key Supabase sebelum digunakan.");
+  else {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+    supabase.auth.getSession().then(({data}) => { if (data.session) showSession(data.session); });
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && !currentUser) showSession(session);
+    });
+  }
+})();
+</script>
+</body>
+</html>
